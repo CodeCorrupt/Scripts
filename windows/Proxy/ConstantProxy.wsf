@@ -1,0 +1,41 @@
+<job>
+<script language="VBScript">
+Option Explicit
+Dim valUserIn
+Dim objShell
+Dim RegLocateServer, RegLocateEnable, RegLocateOverride
+Dim CustomServer, CustomEnable, CustomOverride
+Set objShell = WScript.CreateObject("WScript.Shell")
+On Error Resume Next
+
+valUserIn = MsgBox("Conatnat Custom Proxy?",1,"Custom Proxy")
+
+If valUserIn=vbCancel Then
+	MsgBox "Canceled"
+	WScript.Quit
+Else
+
+	RegLocateServer = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyServer"
+	RegLocateEnable = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyEnable"
+	RegLocateOverride = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyOverride"
+
+	'-----------------------------------------------------------------------------------------------------
+	CustomServer	= "socks=127.0.0.1:2080"
+	CustomEnable	= "1"
+	CustomOverride	= "*idexonline.com;webmail.idexcorp.com;work*.idexcorp.com;*idexftp.com;*idexcorpnet.com;idexwork-ap1.ras.virtela.com;10.*;192.168.*;sts.idexcorp.com;172.16.*;172.17.*;linux;*.toptech.com;<local>"
+	'-----------------------------------------------------------------------------------------------------
+	Do
+		WScript.Sleep 60000
+		'valUserIn= MsgBox ("Continue Constant Proxy?",1,"Continue")
+		'If valUserIn=vbCancel Then
+		'	MsgBox "Canceled"
+		'	WScript.Quit
+		'End If
+		objShell.RegWrite RegLocateServer, CustomServer,"REG_SZ"
+		objShell.RegWrite RegLocateEnable, CustomEnable,"REG_DWORD"
+		objShell.RegWrite RegLocateOverride, CustomOverride,"REG_SZ"
+	Loop
+End If
+WScript.Quit
+</script>
+</job>
