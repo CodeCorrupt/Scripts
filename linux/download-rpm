@@ -1,0 +1,5 @@
+#!/bin/bash
+cat $1 | while read line
+do
+	wget -r -l 50 --no-directories --accept "(echo "$line" | sed -e 's/[.-]/*/g' -e 's/$/\*.rpm/')" $2
+done
