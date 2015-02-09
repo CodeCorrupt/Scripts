@@ -19,27 +19,32 @@ End If
 RegLocateServer = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyServer"
 RegLocateEnable = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyEnable"
 RegLocateOverride = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyOverride"
+RegLocateMigrate = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\MigrateProxy"
 
 '-----------------------------------------------------------------------------------------------------
 CustomServer	= "socks=127.0.0.1:2080"
 CustomEnable	= "1"
 CustomOverride	= "*idexonline.com;webmail.idexcorp.com;work*.idexcorp.com;*idexftp.com;*idexcorpnet.com;idexwork-ap1.ras.virtela.com;10.*;192.168.*;sts.idexcorp.com;172.16.*;172.17.*;linux;*.toptech.com;<local>"
+CustomMigrate	= "1"
 
 DefaultServer	= "proxy-na.idexcorpnet.com"
 DefaultEnable	= "1"
 DefaultOverride	= CustomOverride
+DefaultMigrate	= "1"
 '-----------------------------------------------------------------------------------------------------
 
 If valUserIn=vbYes Then
-	objShell.RegWrite RegLocateServer, CustomServer,"REG_SZ"
-	objShell.RegWrite RegLocateEnable, CustomEnable,"REG_DWORD"
-	objShell.RegWrite RegLocateOverride, CustomOverride,"REG_SZ"
+	objShell.RegWrite RegLocateServer,		CustomServer,		"REG_SZ"
+	objShell.RegWrite RegLocateEnable,		CustomEnable,		"REG_DWORD"
+	objShell.RegWrite RegLocateOverride,	CustomOverride,		"REG_SZ"
+	objShell.RegWrite RegLocateMigrate,		CustomMigrate,		"REG_DWORD"
 	MsgBox "Custom Proxy is Enabled"
 else
-	objShell.RegWrite RegLocateServer, DefaultServer,"REG_SZ"
-	objShell.RegWrite RegLocateEnable, DefaultEnable,"REG_DWORD"
-	objShell.RegWrite RegLocateOverride, DefaultOverride,"REG_SZ"
-	MsgBox "Custom Proxy is Disabled"
+	objShell.RegWrite RegLocateServer,		DefaultServer,		"REG_SZ"
+	objShell.RegWrite RegLocateEnable,		DefaultEnable,		"REG_DWORD"
+	objShell.RegWrite RegLocateOverride,	DefaultOverride,	"REG_SZ"
+	objShell.RegWrite RegLocateMigrate,		DefaultMigrate,		"REG_DWORD"
+	MsgBox "Default Proxy is Enabled"
 End If
 WScript.Quit
 </script>
