@@ -1,0 +1,368 @@
+#!/usr/bin/perl
+# DO NOT MODIFY THIS FILE    Signature: c7197153dd2e208491a1267def502c0f  Branch: release  Version: 4.4.0.611  Date: Fri Aug 10 10:26:53 EDT 2012
+# SQLSig: 8c3331d16ad3445d6a4ce99c0a44a889
+
+use DBI;
+use Text::CSV;
+use utf8;
+
+### Prototypes
+sub help();
+
+$csv = Text::CSV->new({always_quote=>1});
+
+#if no command line, terminate program
+if($#ARGV==-1)
+{
+	die "Missing Filename\n\nInvalid command line argument\nmylist --help for help\n";
+}
+
+my $help=0;
+my $table="";
+my $p="";
+my $o=0;
+my $f="";
+my $c=-1;
+my $first=0;
+my $d=",";
+my $display_field=0;
+for($index=0;$index<=$#ARGV;$index++)
+{
+	if($ARGV[$index]eq "--help")
+	{
+		$help=1;
+	}
+	elsif($index==0)
+	{
+		$table=$ARGV[$index];
+	}
+	elsif($ARGV[$index]=~/^p=/)
+	{
+		($p)=($ARGV[$index]=~/^p=(.*)/);
+	}
+	elsif($ARGV[$index]=~/^f=/)
+	{
+		($f)=($ARGV[$index]=~/^f=(.*)/);
+	}
+	elsif($ARGV[$index]=~/^o=\d+/)
+	{
+		($o)=($ARGV[$index]=~/^o=(\d+)/);
+	}
+	elsif($ARGV[$index]=~/^c=\d+/)
+	{
+		($c)=($ARGV[$index]=~/^c=(\d+)/);
+	}
+	elsif($ARGV[$index]=~/^d=\S+/)
+	{
+		($d)=($ARGV[$index]=~/^d=(\S+)/);
+		$d="$d";
+	}
+	elsif($ARGV[$index]=~/^\+f$/)
+	{
+		$display_field=1;
+	}
+	elsif($ARGV[$index]=~/^\-d$/)
+	{
+		$d="";
+	}
+}
+if($help)
+{
+	help();
+	exit;
+}
+
+
+unless($table)
+{
+	die "Missing Filename\n\nInvalid command line argument\nmylist --help for help\n";
+}
+
+#get environment data
+my $db_host=$ENV{"DB_HOST"};
+my $db_name=$ENV{"DB_NAME"};
+my $db_user=$ENV{"DB_USER"};
+my $db_pwd=$ENV{"DB_PWD"};
+if(!defined $db_pwd or $db_pwd eq "")
+{
+   my $cmd = "/toptech_prj/bin/TTPassHelper +t a=0 u=$db_user n=$db_name p=3306 h=$db_host";
+   $db_pwd = `$cmd`;
+   chomp $db_pwd;
+}
+
+#$db_host="localhost";
+#$db_name="test";
+unless($db_host and $db_name and $db_pwd and $db_user)
+{
+	die "environment variable is not set\n";
+}
+
+#mysql init connection
+$dbh=DBI->connect("DBI:mysql:$db_name:$db_host",$db_user,$db_pwd);
+$sth=$dbh->prepare("SET NAMES 'utf8'");
+$sth->execute;
+$sth=$dbh->prepare("show tables");
+$sth->execute;
+while($mytable=$sth->fetchrow)
+{
+	$sql_table{$mytable}=1;
+}
+
+unless($sql_table{$table})
+{
+	die "Tablename, \"$table\",  does not exist\n";
+}
+
+$sth=$dbh->prepare("describe $table");
+$sth->execute;
+while(@row=$sth->fetchrow_array)
+{
+	#read number of characters and save into array
+	unless(($num)=($row[1]=~/(\d+)/))
+	{
+		if($row[1] =~ /^datetime/)
+		{
+			$num=19;
+		}
+		elsif($row[1] =~ /^date/)
+		{
+			$num=10;
+		}
+		elsif($row[1] =~ /^double/)
+		{
+			$num=15;
+		}
+		else
+		{
+			$num=0;
+			$sth1=$dbh->prepare("select field_length from TextFieldLengths where table_name='$table' and field_name='$row[0]'");
+			$sth1->execute;
+			while(@row1=$sth1->fetchrow_array)
+			{
+				$num=$row1[0];
+			}
+			unless($num)
+			{
+				die "Unknown Text Field Lengths for Field name: $row[0] on Table name: $table\n";
+			}
+		}
+	}
+	push @num_row, $num;
+	#read field name and save into array
+	push @name_row, $row[0];
+}
+my $select="";
+my $select_length="";
+my @field_length;
+
+#use join to concatinate array elements with ','
+for($index=0;$index<=$#name_row;$index++)
+{
+	$select = $select . "rpad($name_row[$index],$num_row[$index],' '),";
+	if($display_field)
+	{
+		$select_length = $select_length . "length($name_row[$index]),";
+		$field_length[$index]=length($name_row[$index])+1;
+	}
+}
+chop $select;
+#$select = $select . ",concat($select)";
+if($display_field)
+{
+	chop $select_length;
+	$sth=$dbh->prepare("select $select_length from $table");
+	$sth->execute;
+	while(@row=$sth->fetchrow_array)
+	{
+		for($index=0;$index<=$#row;$index++)
+		{
+			if($row[$index]+1>$field_length[$index])
+			{
+				$field_length[$index]=$row[$index]+1;
+			}
+		}
+	}
+}
+
+#prepare mysql syntax
+$sth=$dbh->prepare("select $select from $table");
+#print "$select\n";
+$sth->execute;
+if($display_field)
+{
+	for($index=0;$index<=$#name_row;$index++)
+	{
+		print $name_row[$index];
+		#print "$field_length[$index] and " . length($name_row[$index]) . "\n";
+		if($field_length[$index]>length($name_row[$index]))
+		{
+			print " " x($field_length[$index]-length($name_row[$index]));
+			print "|";
+		}
+	}
+	print "\n";
+}
+while(@row=$sth->fetchrow_array)
+{
+	if($display_field)
+	{
+		$line="";
+		for($index=0;$index<=$#row;$index++)
+		{
+			$row[$index]=~s/\s+$//g;
+			$line .= $row[$index];
+			if($field_length[$index]>length($row[$index]))
+			{
+				for($index1=length($row[$index]);$index1<$field_length[$index];$index1++)
+				{
+					$line .= " ";
+				}
+			}
+			 $line .= "|";
+		}
+	}
+	elsif($d)
+	{
+		for($index=0;$index<=$#row;$index++)
+		{
+			$row[$index]="$row[$index]";
+		}
+		#pop @row;
+		#$line=join($d,@row);
+		$status = $csv->combine(@row);
+		if($status==0)
+		{
+			$line = combine(@row);
+		}
+		else
+		{
+			$line = $csv->string();
+		}
+	}
+	else
+	{
+		$line="";
+		for($index=0;$index<=$#row;$index++)
+		{
+			$row[$index]=~s/\cM//g;
+			$row[$index]=~s/\n//g;
+			$line .= $row[$index];
+			if(length($row[$index])<$num_row[$index])
+			{
+				for($index1=length($row[$index]);$index1<$num_row[$index];$index1++)
+				{
+					$line .= " ";
+				}
+			}
+		}
+                utf8::decode($line);
+	}
+	$hash_line{$line}=1;
+}
+foreach $line (sort keys %hash_line)
+{
+	if($p)
+	{
+		unless($line=~/^$p/)
+		{
+			$line="";
+		}
+	}
+	elsif($f and $first==0)
+	{
+		unless($line=~/^$f/)
+		{
+			$line="";
+		}
+		else
+		{
+			$first=1;
+		}
+	}
+	if($line)
+	{
+		if($o)
+		{
+			my @arrayline=split(//,$line);
+			$line="";
+			for($index=0;$index<$o;$index++)
+			{
+				$line = $line . $arrayline[$index];
+			}
+		}
+		if(($c==-1 or $c) and length($line))
+		{
+			if($d and !$display_field)
+			{
+#				print "\"";
+			}
+			print $line;
+			if($d and !$display_field)
+			{
+#				print "\"";
+			}
+			print "\n";
+			if($c)
+			{
+				$c--;
+			}
+		}
+	}
+}
+
+$dbh->disconnect;
+
+
+
+#help screen
+sub help()
+{
+	print<<EOF
+Usage: mylist - lists specified databases records to stdout 
+
+mylist mysql_table [f=first_key] [p=partial_key] [c=count] [o=outlen]
+                   [d=deliminator] [+f] [-d]
+
+Where
+
+    mysql_table     -   Name of database file to list 
+    [f=first_key]   -   Display records starting from specified key
+    [p=partial_key] -   Only display records with specified partial key
+    [c=count]       -   Display specified number of records
+    [o=outlen]      -   Limit displayed record length to specified value
+    [d=deliminator] -   deliminating each field by specified deliminator
+	 [+f]            -   Display fiedls at the top of result
+	 [-d]            -   Not display any deliminator between fields
+EOF
+}
+
+
+# Hacked version of Text::CSV combine
+# This version handles Unicode, allowing for French special characters
+sub combine {
+  my @part = @_;
+  my $column = '';
+  my $combination = '';
+  my $skip_comma = 1;
+  if ($#part >= 0) {
+
+    # at least one argument was given for "combining"...
+    for $column (@part) {
+      if ($skip_comma) {
+
+	# do not put a comma before the first argument...
+	$skip_comma = 0;
+      } else {
+
+	# do put a comma before all arguments except the first argument...
+	$combination .= ',';
+      }
+      $column =~ s/\042/\042\042/go;
+      utf8::decode($column);
+      $combination .= "\042";
+      $combination .= $column;
+      $combination .= "\042";
+    }
+  }
+  return $combination;
+}

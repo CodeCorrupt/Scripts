@@ -1,0 +1,474 @@
+#!/usr/bin/perl
+# DO NOT MODIFY THIS FILE    Signature: e69e658a2fcb2f556458f9e6f4e4a02f  Branch: release  Version: 4.4.0.611  Date: Fri Aug 10 10:26:53 EDT 2012
+# SQLSig: 790fe5ede939e715d699d0c8a349cb2f
+
+use DBI;
+use Text::CSV;
+
+my $csv = Text::CSV->new;
+
+my $row_inserted=0;
+my $row_deleted=0;
+my $row_updated=0;
+my $row_duplicated=0;
+#my $deliminator="\",\"";
+
+
+if($#ARGV==-1)
+{
+	die "Missing Filename\n\nInvalid command line argument\nmylist --help for help\n";
+}
+
+for($index=0;$index<=$#ARGV;$index++)
+{
+	if($ARGV[$index]eq "--help")
+	{
+		$help=1;
+	}
+	elsif($index==0)
+	{
+		$table=$ARGV[$index];
+	}
+	elsif($ARGV[$index]=~/^i=/)
+	{
+		($i)=($ARGV[$index]=~/^i=(.*)/);
+		unless(open(FILE,$i))
+		{
+			die "Filename, \"$i\", does not exist for $table\n";
+		}
+	}
+	elsif($ARGV[$index]=~/^\+c/)
+	{
+		$c=1;
+	}
+	elsif($ARGV[$index]=~/^\+d/)
+	{
+		$d=1;
+	}
+	elsif($ARGV[$index]=~/^\+v/)
+	{
+		$v=1;
+	}
+	elsif($ARGV[$index]=~/^\+f/)
+	{
+		$flat_format=1;
+	}
+}
+
+
+if($help)
+{
+	help();
+	exit;
+}
+unless($i)
+{
+	die "No File Specified for $table\n";
+}
+
+unless($table)
+{
+	die "Missing Filename\n\nInvalid command line argument\nmylist --help for help\n";
+}
+
+if($c and $d)
+{
+	die "flag +c and flag +d cannot have both at the same time\n";
+}
+
+#get environment data
+my $db_host=$ENV{"DB_HOST"};
+my $db_name=$ENV{"DB_NAME"};
+my $db_user=$ENV{"DB_USER"};
+my $db_pwd=$ENV{"DB_PWD"};
+if(!defined $db_pwd or $db_pwd eq "")
+{
+   my $cmd = "/toptech_prj/bin/TTPassHelper +t a=0 u=$dbuser n=$dbname p=3306 h=$dbhost";
+   $db_pwd = `$cmd`;
+   chomp $db_pwd;
+}
+
+#$db_host="localhost";
+#$db_name="test";
+unless($db_host and $db_name and $db_pwd and $db_user)
+{
+	die "environment variable is not set\n";
+}
+
+
+#mysql init connection
+$dbh=DBI->connect("DBI:mysql:$db_name:$db_host",$db_user,$db_pwd);
+$sth=$dbh->prepare("show tables");
+$sth->execute;
+while($mytable=$sth->fetchrow)
+{
+	$sql_table{$mytable}=1;
+}
+
+unless($sql_table{$table})
+{
+	die "Tablename, \"$table\",  does not exist\n";
+}
+
+$sth=$dbh->prepare("describe $table");
+$sth->execute;
+while(@row=$sth->fetchrow_array)
+{
+	if($unknown_char)
+	{
+		die "Unknown number of character: \"" . $row[0] . "\" in $table\nPlease contact Toptech Systems, Inc.\n";
+	}
+	#read number of characters and save into array
+	unless(($num)=($row[1]=~/(\d+)/))
+	{
+		if($row[1] =~ /^datetime/)
+		{
+			$num=19;
+		}
+		elsif($row[1] =~ /^date/)
+		{
+			$num=10;
+		}
+		elsif($row[1] =~ /^double/)
+		{
+			$num=15;
+		}
+		else
+		{ 
+			$num=-1;
+			$unknown_char=1;
+			my $sth1=$dbh->prepare("select field_length from TextFieldLengths where table_name='$table' and field_name='$row[0]'");
+			$sth1->execute;
+			while(@row1=$sth1->fetchrow_array)
+			{
+				$num=$row1[0];
+				$unknown_char=0;
+			}
+		}
+	}
+	push @num_row, $num;
+	#read field name and save into array
+	push @name_row, $row[0];
+	if($row[3])
+	{
+		$primary{$row[0]}=$row[3];
+	}
+}
+
+while($line=<FILE>)
+{
+	chomp $line;
+	#if($line=~/^\s+$/ or length($line)==0){}
+	if($line=~/^\s+$/ ){}
+	else
+	{
+		if($line=~/^No Records Found/)
+		{
+			$dbh->disconnect;
+			die "No Records Found - <$table>\n\n";
+		}
+		#check default deliminator
+		if($csv->parse($line) and !($flat_format))
+		{
+			@flat=$csv->fields;
+			for($index=0;$index<=$#flat;$index++)
+			{
+				$flat[$index]=~s/\'/\\\'/g;
+				if($index==0)
+				{
+					$flat[$index]=~s/^\"//;
+				}
+				if($index==$#flat)
+				{
+					chomp $flat[$index];
+					$flat[$index]=~s/\"$//;
+				}
+				$hash_field{$name_row[$index]}=$flat[$index];
+			}
+		}
+		else
+		{
+			if( !($flat_format) )
+			{
+				@flat=parse($line);
+				for($index=0;$index<=$#flat;$index++)
+				{
+					$flat[$index]=~s/\'/\\\'/g;
+					if($index==0)
+					{
+						$flat[$index]=~s/^\"//;
+					}
+					if($index==$#flat)
+					{
+						chomp $flat[$index];
+						$flat[$index]=~s/\"$//;
+					}
+					$hash_field{$name_row[$index]}=$flat[$index];
+				}
+			}
+			else
+			{
+				@flat=split(//,$line);
+				for($index=0;$index<=$#num_row;$index++)
+				{
+					$data="";
+					if($num_row[$index]==-1)
+					{
+						$index=$#num_row+1;
+					}
+					else
+					{
+						for($index1=0;$index1<$num_row[$index];$index1++)
+						{
+							$data .= shift @flat;
+						}
+						$data=~s/\'/\\\'/g;
+						$hash_field{$name_row[$index]}=$data;
+					}
+				}
+			}
+		}
+		if($c or $d)
+		{
+			#insert/update
+			$syntax="delete from $table where ";
+			foreach $key (keys %primary)
+			{
+				if($primary{$key} eq "MUL")
+				{
+				}
+				else
+				{
+					$syntax .= " $key='$hash_field{$key}' and"
+				}
+			}
+			$syntax=~s/and$//g;
+			#$sth=$dbh->prepare($syntax);
+			#$sth->execute;
+			$deleted=$dbh->do($syntax);
+			if($deleted eq "0E0")
+			{
+				$deleted=0;
+			}
+			if($c)
+			{
+			}
+			else
+			{
+				$row_deleted+=$deleted;
+			}
+		}
+		if($c or (!$c and !$d))
+		{
+			$syntax="insert into $table (" . join(",",@name_row) . ") values(";
+			for($index=0;$index<=$#name_row;$index++)
+			{
+				if($hash_field{$name_row[$index]}=~/^\s+$/ or length($hash_field{$name_row[$index]})==0)
+				{
+					if($primary{$name_row[$index]})
+					{
+						$syntax .= "'";
+						for($index1=0;$index1<$num_row[$index];$index1++)
+						{
+							$syntax .= " ";
+						}
+						$syntax .= "',";
+					}
+					else
+					{
+						$syntax .= "NULL,";
+					}
+				}
+				else
+				{
+					$syntax .= "'$hash_field{$name_row[$index]}',";
+				}
+			}
+			chop $syntax;
+			$syntax .= ")";
+			#print "$syntax\n";
+			#$sth=$dbh->prepare($syntax);
+			#$sth->execute;
+			$inserted=$dbh->do($syntax);
+			if($inserted eq "0E0" or !$inserted)
+			{
+				$inserted=0;
+			}
+			if($c)
+			{
+				if($deleted == 1 and $inserted == 1)
+				{
+					$row_updated++;
+				}
+				else
+				{
+					if($inserted == 0)
+					{
+						$row_duplicated++;
+					}
+					else
+					{
+						$row_inserted+=$inserted;
+						$row_deleted+=$deleted;
+					}
+				}
+			}
+			else
+			{
+				if($inserted)
+				{
+					$row_inserted+=$inserted;
+				}
+				else
+				{
+					$row_duplicated++;
+				}
+			}
+		}
+	}
+}
+
+$dbh->disconnect;
+
+print "Table: $table\n";
+print "\t   Updated row: $row_updated\n";
+print "\t  Inserted row: $row_inserted\n";
+print "\t   Deleted row: $row_deleted\n";
+print "\tDuplicated row: $row_duplicated\n\n";
+
+
+
+sub help()
+{
+	print<<EOF
+Usage: myload - adds, updates or deletes records listed in specified flat file
+
+         to specified database file 
+
+myload mysql_Table i=input file [+c] [+d]
+
+Where
+
+    mysql_Table     -   name of database file to list 
+    i=input file    -   flat file containing records to be added, updated or
+                        deleted
+    [+c]            -   update/add records listed in flat file
+    [+d]            -   delete records listed in flat file
+    [+f]            -   use this flag if your input file is "FLAT FILE"
+
+   NOTE:
+
+        If "+c" or "+d" not specified, will attempt to add records!
+        If the loading file is csv file, please make sure that the file
+    is not "CRLF line terminators" a.k.a DOS format.  
+    If the file is "CRLF line terminators", use dos2unix command.
+EOF
+}
+
+
+# Hacked version of Text::CSV parse
+# This version handles Unicode, allowing for French special characters
+sub parse {
+  my $line = shift;
+  my $keep_biting = 1;
+  my $palatable = 0;
+  if ($line =~ /\n$/) {
+    chop($line);
+    if ($line =~ /\r$/) {
+      chop($line);
+    }
+  }
+  my $mouthful = '';
+  my @part = ();
+  while ($keep_biting and ($palatable = bite(\$line, \$mouthful, \$keep_biting))) {
+    push(@part, $mouthful);
+  }
+  return @part;
+}
+
+# Hacked version of Text::CSV bite
+# This version handles Unicode, allowing for French special characters
+sub bite {
+  my ($line_ref, $piece_ref, $bite_again_ref) = @_;
+  my $in_quotes = 0;
+  my $ok = 0;
+  $$piece_ref = '';
+  $$bite_again_ref = 0;
+  
+  while (1) {
+    if (length($$line_ref) < 1) {
+
+      # end of string...
+      if ($in_quotes) {
+
+	# end of string, missing closing double-quote...
+	last;
+      } else {
+
+	# proper end of string...
+	$ok = 1;
+	last;
+      }
+    } elsif ($$line_ref =~ /^\042/) {
+
+      # double-quote...
+      if ($in_quotes) {
+	if (length($$line_ref) == 1) {
+
+	  # closing double-quote at end of string...
+	  substr($$line_ref, 0, 1) = '';
+	  $ok = 1;
+	  last;
+	} elsif ($$line_ref =~ /^\042\042/) {
+
+	  # an embedded double-quote...
+	  $$piece_ref .= "\042";
+	  substr($$line_ref, 0, 2) = '';
+	} elsif ($$line_ref =~ /^\042,/) {
+
+	  # closing double-quote followed by a comma...
+	  substr($$line_ref, 0, 2) = '';
+	  $$bite_again_ref = 1;
+	  $ok = 1;
+	  last;
+	} else {
+
+	  # double-quote, followed by undesirable character (bad character sequence)...
+	  last;
+	}
+      } else {
+	if (length($$piece_ref) < 1) {
+
+	  # starting double-quote at beginning of string
+	  $in_quotes = 1;
+	  substr($$line_ref, 0, 1) = '';
+	} else {
+
+	  # double-quote, outside of double-quotes (bad character sequence)...
+	  last;
+	}
+      }
+    } elsif ($$line_ref =~ /^,/) {
+
+      # comma...
+      if ($in_quotes) {
+
+	# a comma, inside double-quotes...
+	$$piece_ref .= substr($$line_ref, 0 ,1);
+	substr($$line_ref, 0, 1) = '';
+      } else {
+
+	# a comma, which separates values...
+	substr($$line_ref, 0, 1) = '';
+	$$bite_again_ref = 1;
+	$ok = 1;
+	last;
+      }
+    } else {
+
+      $$piece_ref .= substr($$line_ref, 0 ,1);
+      substr($$line_ref, 0, 1) = '';
+    }
+  }
+  return $ok;
+}
