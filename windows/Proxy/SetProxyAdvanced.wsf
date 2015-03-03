@@ -24,7 +24,7 @@ RegLocateMigrate = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\
 '-----------------------------------------------------------------------------------------------------
 CustomServer	= "socks=127.0.0.1:2080"
 CustomEnable	= "1"
-CustomOverride	= "*idexonline.com;webmail.idexcorp.com;work*.idexcorp.com;*idexftp.com;*idexcorpnet.com;idexwork-ap1.ras.virtela.com;10.*;192.168.*;sts.idexcorp.com;172.16.*;172.17.*;linux;*.toptech.com;<local>"
+CustomOverride	= "*idexonline.com;webmail.idexcorp.com;work*.idexcorp.com;*idexftp.com;*idexcorpnet.com;idexwork-ap1.ras.virtela.com;10.*;192.168.*;sts.idexcorp.com;172.16.*;172.17.*;linux;release.toptech.com;linuxbuild5.toptech.com;linuxbuild.toptech.com;<local>"
 CustomMigrate	= "1"
 
 DefaultServer	= "proxy-na.idexcorpnet.com"
