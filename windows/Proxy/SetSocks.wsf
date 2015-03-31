@@ -1,0 +1,37 @@
+<job>
+<script language="VBScript">
+Option Explicit
+Dim valUserIn
+Dim objShell
+Dim RegLocateServer, RegLocateEnable, RegLocateOverride
+Dim CustomServer, CustomEnable, CustomOverride
+Dim DefaultServer, DefaultEnable, DefaultOverride
+Set objShell = WScript.CreateObject("WScript.Shell")
+On Error Resume Next
+
+RegLocateServer = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyServer"
+RegLocateEnable = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyEnable"
+RegLocateOverride = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyOverride"
+RegLocateMigrate = "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\MigrateProxy"
+
+'-----------------------------------------------------------------------------------------------------
+CustomServer	= "socks=127.0.0.1:2080"
+CustomEnable	= "1"
+CustomOverride	= "*idexonline.com;webmail.idexcorp.com;work*.idexcorp.com;*idexftp.com;*idexcorpnet.com;idexwork-ap1.ras.virtela.com;10.*;192.168.*;sts.idexcorp.com;172.16.*;172.17.*;linux;release.toptech.com;linuxbuild5.toptech.com;linuxbuild.toptech.com;<local>"
+CustomMigrate	= "1"
+
+DefaultServer	= "proxy-na.idexcorpnet.com"
+DefaultEnable	= "1"
+DefaultOverride	= CustomOverride
+DefaultMigrate	= "1"
+'-----------------------------------------------------------------------------------------------------
+
+objShell.RegWrite RegLocateServer,		CustomServer,		"REG_SZ"
+objShell.RegWrite RegLocateEnable,		CustomEnable,		"REG_DWORD"
+objShell.RegWrite RegLocateOverride,	CustomOverride,		"REG_SZ"
+objShell.RegWrite RegLocateMigrate,		CustomMigrate,		"REG_DWORD"
+MsgBox "Custom Proxy is Enabled"
+
+WScript.Quit
+</script>
+</job>
