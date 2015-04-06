@@ -1,0 +1,2 @@
+"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" https://system.netsuite.com/pages/customerlogin.jsp?country=US --proxy-server="socks5://127.0.0.1:2080" --proxy-bypass-list="*idexonline.com, webmail.idexcorp.com, work*.idexcorp.com, *idexftp.com, *idexcorpnet.com, idexwork-ap1.ras.virtela.com, 10.*, 192.168.*, sts.idexcorp.com, 172.16.*, 172.17.*, linux, release.toptech.com, linuxbuild5.toptech.com, linuxbuild.toptech.com, localhost"
+exit
