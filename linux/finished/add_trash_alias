@@ -1,0 +1,9 @@
+#!/bin/bash
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $(basename $0) <<name of file to export to>>"
+    exit
+fi
+echo "" >> $1
+echo "#These commands will implement a trash like function so you don't compleately remove files unless you want to." >> $1
+echo "trash () { mkdir -p ~/.trash && mv "$@" ~/.trash; }   #Make a trash directory if it does not exist and move the files to it" >> $1
+echo "alias empty='rm -rf ~/.trash/*'                       #Empty the .trash folder" >> $1
