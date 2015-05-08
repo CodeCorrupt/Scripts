@@ -1,0 +1,31 @@
+#!/bin/bash
+alias ts='trash'                            # Abreviation for homebrews trash
+trash () {				    # trash:        Moves a file to the MacOS trash 
+	mkdir -p ~/.trash
+	mv "$@" ~/.trash
+	. /set_title.sh #TODO: Make this have $PWD and work....
+
+empty () {				    # empty:	    Empties the .trash folder
+	IFS=$'\n'
+	for line in $(ls -lASh ~/.trash | awk '{print $5"\t"$9}' | sed "1 d")
+	do
+		success=0;
+		while [ $success -eq 0 ]
+		do
+			FILE=$(echo $line | awk '{print $2}')
+			SIZE=$(echo $line | awk '{print $1}')
+			echo "remove '$FILE' to free $SIZE? "
+			read answer
+			case "$answer"
+			in
+				[yY] | [yY][eE][sS])
+					rm -rf ~/.trash/$FILE && success=1 ;;
+				[nN] | [nN][oO])
+					success=1 ;;
+				*)
+					echo "I don't understand '$answer'" && success=0 ;;
+			esac
+		done
+	done
+	. ~/.myscripts/set_title.sh;
+}
