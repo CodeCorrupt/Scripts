@@ -9,11 +9,11 @@ output_file=""
 bays=0
 units=0
 lcs=0
-trace=1 #1 to put things in trace 0 to take them out
+add_arg=1
 force=0
-trace_str="+t"
+arg_str="+t"
 
-while getopts "h?bultfs:" opt; do
+while getopts "h?buldfa:" opt; do
     case "$opt" in
     h|\?)
         echo "Usage goes here"
@@ -25,11 +25,11 @@ while getopts "h?bultfs:" opt; do
         ;;
     l)  lcs=1
         ;;
-    t)  trace=0 #Will undo the trace (Delete the +t)
+    d)  add_arg=0 #Will undo the trace (Delete the +t)
         ;;
     f)  force=1 #Will force the change and not ask for each entry, but will still ask at the end for restart
         ;;
-    s)  trace_str=$OPTARG
+    a)  arg_str=$OPTARG
         ;;
     *)
         echo "what the hell did you enter???"
@@ -68,7 +68,7 @@ ask () {
 }
 
 echo "--IMPORTANT-- None of the imputs are MySql escaped. PLEASE do not put any hacker shit!"
-echo "Enter two digit bay #: "
+echo "Enter two digit bay #s comma separated: "
 read bay_no
 bay_cfg=$(echo $(mysql -u ttadmin -ptoptech -D Tms6Data --skip-column-names -e "SELECT config_file FROM BayProfile WHERE ld_bay IN ($bay_no);") | tr " " "\n" | sort | uniq)
 echo -e "\nBay Configs:\n----------\n$bay_cfg"
@@ -83,34 +83,34 @@ echo -e "\nUnit LCs:\n----------\n$unit_lc"
 echo "bays = $bays"
 echo "units = $units"
 echo "lc = $lc"
-echo "trace = $trace"
+echo "add_arg = $add_arg"
 echo "force = $force"
-echo "trace_str = $trace_str"
+echo "arg_str = $arg_str"
 
 cd /tms6/cfg # Switch to the cfg directory as none of the file names are fully pathed
 if [ "$bays" -eq "1" ]
 then
     for bay in $bay_cfg
     do
-        baytrace=$(tail -1 $bay | rev | cut -d' ' -f2- | rev | awk '{print $0" "}')$trace_str
+        bayarg=$(tail -1 $bay | rev | cut -d' ' -f2- | rev | awk '{print $0" "}')$arg_str
         if ask $bay
         then
-            if [ "$trace" -eq "1" ]
+            if [ "$add_arg" -eq "1" ]
             then
-                if grep -q -w "$trace_str" "$bay"
+                if grep -q -w "$arg_str" "$bay"
                 then
-                    echo "$bay is already in trace"
+                    echo "$bay is already uses $arg_str"
                 else
-                    echo "adding trace to $bay"
-                    echo "$baytrace" >> $bay
+                    echo "adding $arg_str to $bay"
+                    echo "$bayarg" >> $bay
                 fi
             else
-                if grep -q -w "$trace_str" "$bay"
+                if grep -q -w "$arg_str" "$bay"
                 then
-                    echo "removing trace form $bay"
-                    sed --in-place=.bak "/$trace_str\b/d" $bay
+                    echo "removing $arg_str form $bay"
+                    sed --in-place=.bak "/$arg_str\b/d" $bay
                 else
-                    echo "$bay is already not in trace"
+                    echo "$bay is not using $arg_str"
                 fi
             fi
         else
@@ -123,25 +123,25 @@ if [ "$units" -eq "1" ]
 then
     for unit in $unit_cfg
     do
-        unittrace="$trace_str"
+        unitarg="$arg_str"
         if ask $unit
         then
-            if [ "$trace" -eq "1" ]
+            if [ "$add_arg" -eq "1" ]
             then
-                if grep -q -w "$trace_str" "$unit"
+                if grep -q -w "$arg_str" "$unit"
                 then
-                    echo "$unit is already in trace"
+                    echo "$unit already uses $arg_str"
                 else
-                    echo "adding trace to $unit"
-                    echo "$unittrace" >> $unit
+                    echo "adding $arg_str to $unit"
+                    echo "$unitarg" >> $unit
                 fi
             else
-                if grep -q -w "$trace_str" "$unit"
+                if grep -q -w "$arg_str" "$unit"
                 then
-                    echo "removing trace form $unit"
-                    sed --in-place=.bak "/$trace_str\b/d" $unit
+                    echo "removing $arg_str form $unit"
+                    sed --in-place=.bak "/$arg_str\b/d" $unit
                 else
-                    echo "$unit is already not in trace"
+                    echo "$unit is not using $arg_str"
                 fi
             fi
         else
@@ -150,10 +150,10 @@ then
     done
 fi
 
-if [ "$lcs" -eq "1" ]
-then
-    for lc in $lcs
-    do
-        
-    done
-fi
+#if [ "$lcs" -eq "1" ]
+#then
+#    for lc in $lcs
+#    do
+#        
+#    done
+#fi
