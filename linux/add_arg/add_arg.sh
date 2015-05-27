@@ -78,8 +78,10 @@ bay_lc=$(echo $(mysql -u ttadmin -ptoptech -D Tms6Data --skip-column-names -e "S
 echo -e "\nBay LCs:\n----------\n$bay_lc"
 unit_lc=$(echo $(mysql -u ttadmin -ptoptech -D Tms6Data --skip-column-names -e "SELECT control_name FROM PresetProfile WHERE ld_bay IN ($bay_no);") | tr " " "\n" | sort | uniq)
 echo -e "\nUnit LCs:\n----------\n$unit_lc"
+all_lc=$(echo $bay_lc $unit_lc | tr " " "\n" | sort | uniq)
+echo -e "\nAll LCs:\n----------\n$all_lc"
 
-
+echo
 echo "bays = $bays"
 echo "units = $units"
 echo "lc = $lc"
@@ -150,10 +152,15 @@ then
     done
 fi
 
-#if [ "$lcs" -eq "1" ]
-#then
-#    for lc in $lcs
-#    do
-#        
-#    done
-#fi
+if [ "$lcs" -eq "1" ]
+then
+    for lc in $all_lc
+    do
+        process=$(ps -C lc -o pid,command= | grep n=$lc)
+        echo
+        lcpid=$(echo $process | awk '{print $0}')
+        echo
+        lccmd=$(echo $process | awk '{print $1}')
+        echo $lccmd $lcpid
+    done
+fi
