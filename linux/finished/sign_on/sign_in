@@ -1,0 +1,18 @@
+#!/usr/bin/expect -f
+
+#Read variables
+set ip [lindex $argv 0]
+set user [lindex $argv 1]
+set pass [lindex $argv 2]
+#execture
+spawn ssh $user\@$ip
+expect {
+    -re ".*es.*o.*" {
+        exp_send "yes\r"
+        exp_continue
+    }
+    -re ".*sword.*" {
+        exp_send "$pass\r"
+    }
+}
+interact

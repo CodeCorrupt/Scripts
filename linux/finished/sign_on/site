@@ -1,0 +1,160 @@
+#!/bin/bash
+
+# Print usage
+usage() {
+	echo "Usage goes here..."
+}
+
+# Process Arguments
+# A POSIX variable
+OPTIND=1         # Reset in case getopts has been used previously in the shell.
+EXPECT_ARG_COUNT=1 # number of args AFTER the flags
+# Initialize our own variables:
+DELIM=';'
+ROOTUSER='root'
+CONNECTIONS="$(dirname $(readlink -f $0))/connections"
+EDIT=0
+ROOT=0
+
+while getopts "h?f:er" opt; do
+    case "$opt" in
+    h|\?)
+        usage
+		exit 0
+        ;;
+    f)
+		CONNECTIONS=$(readlink -f $OPTARG)
+		echo "$CONNECTIONS"
+		;;
+	e)
+		EDIT=1
+		;;
+	r)
+		ROOT=1
+		;;
+	*)
+        echo "What the hell did you enter???"
+        exit 1
+		;;
+    esac
+done
+
+shift $((OPTIND-1))
+
+[ "$1" = "--" ] && shift
+
+if [ "$#" -ne "$EXPECT_ARG_COUNT" ]; then
+	exit 0
+fi
+
+################################################################################
+############################## Actual code... ##################################
+################################################################################
+
+ask() {
+	while :; do
+		read -p "$1 (y/n): " -n 1 -r
+		echo
+		case $REPLY in
+			N|n)
+		    	return 1
+		    	;;
+			Y|y)
+		    	return 0
+	    		;;
+			*)
+				echo "I dont understand \"$REPLY\""
+				;;
+		esac
+	done
+}
+
+
+# Get the line that matchest the site code provided
+line=$(grep "^$1" $CONNECTIONS)
+
+# Ensure there is only one entry for that site code
+if [ $(echo "$line" | wc -l) -gt "1" ]; then
+	echo "There are two lines! ERROR, ERROR, DANGER WILL ROBINSON, DANGER!"
+	return 1
+fi
+# If the line is good then parse it in to components
+code=$(echo "$line" | cut -f1 -d$DELIM | sed "s/^\s\+//" | sed "s/\s\+$//")
+if [ -z "$code" ]; then
+	if ! ask "There is no site information for site \"$1\". Would you like to add it?"; then
+		exit 0;
+	fi
+	mod=1
+	new=1
+	code="$1"
+fi
+echo "Site Code:  $code"
+
+ip=$(echo "$line" | cut -f2 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
+if [ -z "$ip" ] || [ "$EDIT" == "1" ] ; then
+	echo "Enter new IP for site $code"
+	read -p "Please enter an IP: " newip
+	if [ ! -z "$newip" ] ; then
+		ip=$newip
+		mod=1
+	fi
+fi
+
+user=$(echo "$line" | cut -f3 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
+if [ -z "$user" ] || [ "$EDIT" == "1" ] ; then
+	echo "Enter new user information for site $code"
+	read -p "Please enter the User Name: " newuser
+	if [ ! -z $newuser ] ; then
+		user=$newuser
+		mod=1
+	fi
+fi
+
+pass=$(echo "$line" | cut -f4 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
+if [ -z "$pass" ] || [ "$EDIT" == "1" ] ; then
+	echo "Enter new password for user $user at site $code"
+	read -p "Please enter the user's password: " newpass
+	if [ ! -z $newpass ] ; then
+		pass=$newpass
+		mod=1
+	fi
+fi
+
+rpass=$(echo "$line" | cut -f5 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
+if [ -z "$rpass" ] || [ "$EDIT" == "1" ] ; then
+	echo "Enter new root password for site $code"
+	read -p "Please enter the root password: " newrpass
+	if [ ! -z $newrpass ] ; then
+		rpass=$newrpass
+		mod=1
+	fi
+fi
+
+if [ "$mod" == "1" ] ; then
+	newstring="$code$DELIM $ip$DELIM $user$DELIM $pass$DELIM $rpass"
+	echo -e "Writing new string to file:\n\t$newstring"
+	if ask "Is this ok?" ; then
+		if [ "$new" == "1" ] ; then
+			echo "$newstring" >> $CONNECTIONS
+		else
+			sed -i "s/^$code.*/$newstring/" $CONNECTIONS
+		fi
+	fi
+fi
+
+echo "Site Code:  $code"
+echo "IP:         $ip"
+echo "User:		  $user"
+echo "user's pw:  $pass"
+echo "root pw:    $rpass"
+
+if ! ask "Would you like to log in?"; then
+	exit 0
+fi
+
+#Log in to site
+if [ "$ROOT" == "1" ] ; then
+	user="$ROOTUSER"
+	pass="$rpass"
+fi
+$(dirname $(readlink -f $0))/sign_in $ip $user $pass

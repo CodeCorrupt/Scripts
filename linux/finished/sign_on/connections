@@ -1,0 +1,7 @@
+# This consists of 4 ';' seperated fields
+# 1) Site code	- The 6 alpha/numeric code that identefies the site
+# 2) IP			- The IP of the site
+# 3) User		- The user name for the site
+# 4) User Pass	- The password for the abover user name
+# 5) Root Pass	- The root password
+# EX:   TEST1; 123.123.123.123; thoyt; p@ssword; r00tP@$$w0rd
