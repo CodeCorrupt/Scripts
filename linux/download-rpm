@@ -4,8 +4,7 @@
 # separated by a newline. the second is which website repo to get them form. (linuxbuild, linuxbuild5, 
 # release, ect...)
 
-
 cat $1 | while read line
 do
-	wget -r -l 50 --no-directories --accept "(echo "$line" | sed -e 's/[.-]/*/g' -e 's/$/\*.rpm/')" $2
+    wget -r -l 50 --no-directories --accept "$(echo "$line" | sed -e 's/-/\*/g')" $2
 done
