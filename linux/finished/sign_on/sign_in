@@ -15,4 +15,8 @@ expect {
         exp_send "$pass\r"
     }
 }
+expect {
+    "$ " { send "mylist TerminalProfile | cut -d'\"' -f6\r" }
+    "# " { send "" }
+}
 interact
