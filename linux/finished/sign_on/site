@@ -15,8 +15,9 @@ ROOTUSER='root'
 CONNECTIONS="$(dirname $(readlink -f $0))/connections"
 EDIT=0
 ROOT=0
+IPONLY=0
 
-while getopts "h?f:er" opt; do
+while getopts "h?f:eri" opt; do
     case "$opt" in
     h|\?)
         usage
@@ -31,6 +32,9 @@ while getopts "h?f:er" opt; do
 		;;
 	r)
 		ROOT=1
+		;;
+	i)
+		IPONLY=1
 		;;
 	*)
         echo "What the hell did you enter???"
@@ -78,6 +82,7 @@ if [ $(echo "$line" | wc -l) -gt "1" ]; then
 	echo "There are two lines! ERROR, ERROR, DANGER WILL ROBINSON, DANGER!"
 	return 1
 fi
+
 # If the line is good then parse it in to components
 code=$(echo "$line" | cut -f1 -d$DELIM | sed "s/^\s\+//" | sed "s/\s\+$//")
 if [ -z "$code" ]; then
@@ -88,7 +93,6 @@ if [ -z "$code" ]; then
 	new=1
 	code="$1"
 fi
-echo "Site Code:  $code"
 
 ip=$(echo "$line" | cut -f2 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
 if [ -z "$ip" ] || [ "$EDIT" == "1" ] ; then
@@ -98,6 +102,11 @@ if [ -z "$ip" ] || [ "$EDIT" == "1" ] ; then
 		ip=$newip
 		mod=1
 	fi
+fi
+
+if [ "$IPONLY" == "1" ] ; then
+	echo "$ip"
+	exit 0
 fi
 
 user=$(echo "$line" | cut -f3 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
