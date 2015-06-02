@@ -1,8 +1,40 @@
 #!/bin/bash
 
+
+
+
 # Print usage
 usage() {
-	echo "Usage goes here..."
+	echo "Usage:"
+	echo "    $(basename $0) [-h|-?] [-n FILE_NAME] [-ericqf] SITE_CODE"
+	echo ""
+	echo "Options:"
+	echo "    -h/-?"
+	echo "        Displays the help/usage message. AKA... this..."
+	echo "    -n FILE_NAME"
+	echo "        Specifies a different file lcoation for the connection list."
+	echo "        The default file location is the same directory as the script."
+	echo "    -e"
+	echo "        Puts the script into edit mode. Edit mode allows you to change"
+	echo "        the properties of that connection. If a field is left blank then"
+	echo "        the current value is kept. If the value is blank you will be"
+	echo "        prompted every time you select that site to enter a value."
+	echo "        Will create a backup of connections as a .backup "
+	echo "    -r"
+	echo "        Logs in as root. Also works with -c"
+	echo "    -i"
+	echo "        Returns only the IP of the provided site and exits"
+	echo "    -c"
+	echo "        Returns the username@ip formated for use with scp."
+	echo "          ie. \"scp \$(site -c SITE_CODE):file1 .\""
+	echo "    -q"
+	echo "        Quite. Makes the script have minimal output."
+	echo "    -d"
+	echo "        Delete. Deletes the entry. Will create a backup of connections as a .backup"
+	echo "    -f"
+	echo "        Force. Forces the script so it does not ask for confirmation."
+	echo ""
+	echo "Brought to you by Tyler Hoyt."
 }
 
 # Process Arguments
@@ -16,14 +48,18 @@ CONNECTIONS="$(dirname $(readlink -f $0))/connections"
 EDIT=0
 ROOT=0
 IPONLY=0
+USERIP=0
+VERB=1
+FORCE=0
+DEL=0
 
-while getopts "h?f:eri" opt; do
+while getopts "h?n:ericqfd" opt; do
     case "$opt" in
     h|\?)
         usage
 		exit 0
         ;;
-    f)
+    n)
 		CONNECTIONS=$(readlink -f $OPTARG)
 		echo "$CONNECTIONS"
 		;;
@@ -35,6 +71,18 @@ while getopts "h?f:eri" opt; do
 		;;
 	i)
 		IPONLY=1
+		;;
+	c)
+		USERIP=1
+		;;
+	q)
+		VERB=0
+		;;
+	f)
+		FORCE=1
+		;;
+	d)
+		DEL=1
 		;;
 	*)
         echo "What the hell did you enter???"
@@ -56,8 +104,13 @@ fi
 ################################################################################
 
 ask() {
+	#If force is turned on then don't ask, simply return true
+	if [ "$FORCE" == "1" ] ; then
+		return 0
+	fi
+	#Keep asking the question until I get a good response
 	while :; do
-		read -p "$1 (y/n): " -n 1 -r
+		read -p "$1 (y/n): " -r
 		echo
 		case $REPLY in
 			N|n)
@@ -85,6 +138,37 @@ fi
 
 # If the line is good then parse it in to components
 code=$(echo "$line" | cut -f1 -d$DELIM | sed "s/^\s\+//" | sed "s/\s\+$//")
+ip=$(echo "$line" | cut -f2 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
+user=$(echo "$line" | cut -f3 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
+pass=$(echo "$line" | cut -f4 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
+rpass=$(echo "$line" | cut -f5 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
+
+#If the user wants the username@ip then print it for root or regular
+if [ "$USERIP" == "1" ] ; then
+	if [ "$ROOT" == "1" ] ; then
+		echo "$ROOTUSER@$ip"
+	else
+		echo "$user@$ip"
+	fi
+	exit 0
+fi
+
+#If the user only wants the IP then print it and exit
+if [ "$IPONLY" == "1" ] ; then
+	echo "$ip"
+	exit 0
+fi
+
+if [ "$DEL" == "1" ] ; then
+	if ask "Do you want to delete $code?" ; then
+		if ask "Are you sure you want to delete $code?" ; then
+			sed -i.backup "/^$code.*/d" $CONNECTIONS
+		fi
+	fi
+	exit 0
+fi
+
+#If anything is missing or we are in edit mode then prompt the user
 if [ -z "$code" ]; then
 	if ! ask "There is no site information for site \"$1\". Would you like to add it?"; then
 		exit 0;
@@ -94,7 +178,6 @@ if [ -z "$code" ]; then
 	code="$1"
 fi
 
-ip=$(echo "$line" | cut -f2 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
 if [ -z "$ip" ] || [ "$EDIT" == "1" ] ; then
 	echo "Enter new IP for site $code"
 	read -p "Please enter an IP: " newip
@@ -104,12 +187,6 @@ if [ -z "$ip" ] || [ "$EDIT" == "1" ] ; then
 	fi
 fi
 
-if [ "$IPONLY" == "1" ] ; then
-	echo "$ip"
-	exit 0
-fi
-
-user=$(echo "$line" | cut -f3 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
 if [ -z "$user" ] || [ "$EDIT" == "1" ] ; then
 	echo "Enter new user information for site $code"
 	read -p "Please enter the User Name: " newuser
@@ -119,7 +196,6 @@ if [ -z "$user" ] || [ "$EDIT" == "1" ] ; then
 	fi
 fi
 
-pass=$(echo "$line" | cut -f4 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
 if [ -z "$pass" ] || [ "$EDIT" == "1" ] ; then
 	echo "Enter new password for user $user at site $code"
 	read -p "Please enter the user's password: " newpass
@@ -129,7 +205,6 @@ if [ -z "$pass" ] || [ "$EDIT" == "1" ] ; then
 	fi
 fi
 
-rpass=$(echo "$line" | cut -f5 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
 if [ -z "$rpass" ] || [ "$EDIT" == "1" ] ; then
 	echo "Enter new root password for site $code"
 	read -p "Please enter the root password: " newrpass
@@ -139,6 +214,7 @@ if [ -z "$rpass" ] || [ "$EDIT" == "1" ] ; then
 	fi
 fi
 
+# If any of the fields were modefied then ask if it's ok and write it to the file
 if [ "$mod" == "1" ] ; then
 	newstring="$code$DELIM $ip$DELIM $user$DELIM $pass$DELIM $rpass"
 	echo -e "Writing new string to file:\n\t$newstring"
@@ -146,24 +222,26 @@ if [ "$mod" == "1" ] ; then
 		if [ "$new" == "1" ] ; then
 			echo "$newstring" >> $CONNECTIONS
 		else
-			sed -i "s/^$code.*/$newstring/" $CONNECTIONS
+			sed -i.backup "s/^$code.*/$newstring/" $CONNECTIONS
 		fi
 	fi
 fi
 
-echo "Site Code:  $code"
-echo "IP:         $ip"
-echo "User:		  $user"
-echo "user's pw:  $pass"
-echo "root pw:    $rpass"
-
-if ! ask "Would you like to log in?"; then
-	exit 0
+#Display the info for the user if verbose
+if [ "$VERB" == "1" ] ; then 
+	echo "Site Code:  $code"
+	echo "IP:         $ip"
+	echo "User:		  $user"
+	echo "user's pw:  $pass"
+	echo "root pw:    $rpass"
 fi
 
 #Log in to site
-if [ "$ROOT" == "1" ] ; then
-	user="$ROOTUSER"
-	pass="$rpass"
+if ! ask "Would you like to log in?"; then
+	exit 0
 fi
-$(dirname $(readlink -f $0))/sign_in $ip $user $pass
+if [ "$ROOT" == "1" ] ; then
+	$(dirname $(readlink -f $0))/sign_in $ip $ROOTUSER $rpass
+else
+	$(dirname $(readlink -f $0))/sign_in $ip $user $pass
+fi
