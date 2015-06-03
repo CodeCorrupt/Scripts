@@ -1,8 +1,5 @@
 #!/bin/bash
 
-
-
-
 # Print usage
 usage() {
 	echo "Usage:"
@@ -52,6 +49,7 @@ USERIP=0
 VERB=1
 FORCE=0
 DEL=0
+PASSWORD="toptech"
 
 while getopts "h?n:ericqfd" opt; do
     case "$opt" in
@@ -174,7 +172,6 @@ if [ -z "$code" ]; then
 		exit 0;
 	fi
 	mod=1
-	new=1
 	code="$1"
 fi
 
@@ -197,19 +194,31 @@ if [ -z "$user" ] || [ "$EDIT" == "1" ] ; then
 fi
 
 if [ -z "$pass" ] || [ "$EDIT" == "1" ] ; then
-	echo "Enter new password for user $user at site $code"
-	read -p "Please enter the user's password: " newpass
-	if [ ! -z $newpass ] ; then
-		pass=$newpass
+	newpass1="1"
+	newpass2="2"
+	while [ "$newpass1" != "$newpass2" ] ; do
+    	read -sp "Enter new password for user $user at site $code: " newpass1
+		echo
+    	read -sp "Please re-enter the user's password: " newpass2
+		echo
+	done
+	if [ ! -z $newpass1 ] ; then
+		pass=$(echo $newpass1 | openssl enc -aes-128-cbc -a -salt -pass pass:"$password")
 		mod=1
 	fi
 fi
 
 if [ -z "$rpass" ] || [ "$EDIT" == "1" ] ; then
-	echo "Enter new root password for site $code"
-	read -p "Please enter the root password: " newrpass
-	if [ ! -z $newrpass ] ; then
-		rpass=$newrpass
+	newrpass1="1"
+	newrpass2="2"
+	while [ "$newrpass1" != "$newrpass2" ] ; do
+		read -sp "Enter new root password for site $code: " newrpass1
+		echo
+    	read -sp "Please re-enter the root password: " newrpass2
+		echo
+	done
+	if [ ! -z $newrpass1 ] ; then
+		rpass=$(echo $newrpass1 | openssl enc -aes-128-cbc -a -salt -pass pass:"$password")
 		mod=1
 	fi
 fi
@@ -217,13 +226,10 @@ fi
 # If any of the fields were modefied then ask if it's ok and write it to the file
 if [ "$mod" == "1" ] ; then
 	newstring="$code$DELIM $ip$DELIM $user$DELIM $pass$DELIM $rpass"
-	echo -e "Writing new string to file:\n\t$newstring"
+	echo -e "Writing connection to file:\n\t$newstring"
 	if ask "Is this ok?" ; then
-		if [ "$new" == "1" ] ; then
-			echo "$newstring" >> $CONNECTIONS
-		else
-			sed -i.backup "s/^$code.*/$newstring/" $CONNECTIONS
-		fi
+		sed -i.backup "/^$code.*/d" $CONNECTIONS
+		echo "$newstring" >> $CONNECTIONS
 	fi
 fi
 
@@ -231,7 +237,7 @@ fi
 if [ "$VERB" == "1" ] ; then 
 	echo "Site Code:  $code"
 	echo "IP:         $ip"
-	echo "User:		  $user"
+	echo "User:       $user"
 	echo "user's pw:  $pass"
 	echo "root pw:    $rpass"
 fi
@@ -241,7 +247,7 @@ if ! ask "Would you like to log in?"; then
 	exit 0
 fi
 if [ "$ROOT" == "1" ] ; then
-	$(dirname $(readlink -f $0))/sign_in $ip $ROOTUSER $rpass
+	$(dirname $(readlink -f $0))/sign_in $ip $ROOTUSER $(echo $rpass | openssl enc -aes-128-cbc -a -d -salt -pass pass:"$password")
 else
-	$(dirname $(readlink -f $0))/sign_in $ip $user $pass
+	$(dirname $(readlink -f $0))/sign_in $ip $user $(echo $pass | openssl enc -aes-128-cbc -a -d -salt -pass pass:"$password")
 fi
