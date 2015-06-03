@@ -3,7 +3,7 @@
 # Print usage
 usage() {
 	echo "Usage:"
-	echo "    $(basename $0) [-h|-?] [-n FILE_NAME] [-ericqf] SITE_CODE"
+	echo "    $(basename $0) [-h|-?] [-n FILE_NAME] [-p PASSWORD] [-ericqdft] SITE_CODE"
 	echo ""
 	echo "Options:"
 	echo "    -h/-?"
@@ -30,7 +30,10 @@ usage() {
 	echo "        Delete. Deletes the entry. Will create a backup of connections as a .backup"
 	echo "    -f"
 	echo "        Force. Forces the script so it does not ask for confirmation."
-	echo "    -p"
+	echo "    -t"
+	echo "        Tells the program to estabish a tunnel to access mysql"
+	echo "          -L 4567:localhost:3306"
+	echo "    -p PASSWORD"
 	echo "        Supply the program password (One password to rule them all)"
 	echo "        This is not a site specifiv password. It is used to decrypt the other passwords"
 	echo "    NOTE: The password can never be changed as it is used to encrypt the passwords of"
@@ -55,10 +58,11 @@ USERIP=0
 VERB=1
 FORCE=0
 DEL=0
+USE_TUNNEL=0
 PASSWORD=""	########################################### To make this program secure. remove the text between the quotes so it assigns PASSWORD an empty string.
 HPASSWORD="1f23be7d7b7b36403c46be71939012a3  -" ############### This is the md5 of the password. 
 
-while getopts "h?n:ericqfdp:" opt; do
+while getopts "h?n:ericqfdp:t" opt; do
     case "$opt" in
     h|\?)
         usage
@@ -90,6 +94,9 @@ while getopts "h?n:ericqfdp:" opt; do
 		;;
     p)
 		PASSWORD=$OPTARG
+		;;
+    t)
+		USE_TUNNEL=1
 		;;
 	*)
         echo "What the hell did you enter???"
@@ -133,26 +140,6 @@ ask() {
 	done
 }
 
-# If the user did not supply the password through the command line
-#	and the password is not included in the headder then get it.
-tries=0
-while [ -z "$PASSWORD"  ] ; do
-	read -sp "Password: " PASSWORD
-	echo
-	if [ "$(echo $PASSWORD | md5sum)" != "$HPASSWORD" ] ; then
-		tries=$(($tries+1))
-		echo "$tries failed attempt(s)"
-		if [ $tries -eq 2 ] ; then
-			echo "Hint: It's the same password used EVERYWHERE at Toptech"
-		fi
-		if [ $tries -eq 3 ] ; then
-			echo "Too many failed attempts"
-			exit 0
-		fi
-		PASSWORD=""
-	fi
-done
-
 # Get the line that matchest the site code provided
 line=$(grep "^$1" $CONNECTIONS)
 
@@ -193,6 +180,26 @@ if [ "$DEL" == "1" ] ; then
 	fi
 	exit 0
 fi
+
+# If the user did not supply the password through the command line
+#	and the password is not included in the headder then get it.
+tries=0
+while [ -z "$PASSWORD"  ] ; do
+	read -sp "Password: " PASSWORD
+	echo
+	if [ "$(echo $PASSWORD | md5sum)" != "$HPASSWORD" ] ; then
+		tries=$(($tries+1))
+		echo "$tries failed attempt(s)"
+		if [ $tries -eq 2 ] ; then
+			echo "Hint: It's the same password used EVERYWHERE at Toptech"
+		fi
+		if [ $tries -eq 3 ] ; then
+			echo "Too many failed attempts"
+			exit 0
+		fi
+		PASSWORD=""
+	fi
+done
 
 #If anything is missing or we are in edit mode then prompt the user
 if [ -z "$code" ]; then
@@ -283,7 +290,7 @@ if ! ask "Would you like to log in?"; then
 	exit 0
 fi
 if [ "$ROOT" == "1" ] ; then
-	$(dirname $(readlink -f $0))/sign_in $ip $ROOTUSER $(echo $rpass | openssl enc -aes-128-cbc -a -d -salt -pass pass:"$PASSWORD")
+	$(dirname $(readlink -f $0))/sign_in $ip $ROOTUSER $(echo $rpass | openssl enc -aes-128-cbc -a -d -salt -pass pass:"$PASSWORD") $USE_TUNNEL
 else
-	$(dirname $(readlink -f $0))/sign_in $ip $user $(echo $pass | openssl enc -aes-128-cbc -a -d -salt -pass pass:"$PASSWORD")
+	$(dirname $(readlink -f $0))/sign_in $ip $user $(echo $pass | openssl enc -aes-128-cbc -a -d -salt -pass pass:"$PASSWORD") $USE_TUNNEL
 fi

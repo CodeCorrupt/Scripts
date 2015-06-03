@@ -4,8 +4,14 @@
 set ip [lindex $argv 0]
 set user [lindex $argv 1]
 set pass [lindex $argv 2]
+set use_tunnel [lindex $argv 3]
 #execture
-spawn ssh $user\@$ip
+
+if { $use_tunnel == 1 } {
+	spawn ssh -L 4567:localhost:3306 $user\@$ip
+} else {
+	spawn ssh $user\@$ip
+}
 expect {
     -re ".*es.*o.*" {
         exp_send "yes\r"
