@@ -3,45 +3,48 @@
 # Print usage
 usage() {
 	echo "Usage:"
-	echo "    $(basename $0) [-h|-?] [-n FILE_NAME] [-p PASSWORD] [-ericqdftl] SITE_CODE"
+	echo "    $(basename $0) [-h|-?] [-n FILE_NAME] [-p PASSWORD] [-ericqdftlim] SITE_CODE"
 	echo ""
 	echo "Options:"
 	echo "    -h/-?"
-	echo "        Displays the help/usage message. AKA... this..."
+	echo "        Help: Displays the help/usage message. AKA... this..."
 	echo "    -n FILE_NAME"
-	echo "        Specifies a different file lcoation for the connection list."
+	echo "        fileName: Specifies a different file lcoation for the connection list."
 	echo "        The default file location is the same directory as the script."
 	echo "    -e"
-	echo "        Puts the script into edit mode. Edit mode allows you to change"
+	echo "        Edit: Puts the script into edit mode. Edit mode allows you to change"
 	echo "        the properties of that connection. If a field is left blank then"
 	echo "        the current value is kept. If the value is blank you will be"
 	echo "        prompted every time you select that site to enter a value."
 	echo "        Will create a backup of connections as a .backup "
 	echo "    -r"
-	echo "        Logs in as root. Also works with -c"
+	echo "        Root: Logs in as root. Also works with -c"
 	echo "    -i"
-	echo "        Returns only the IP of the provided site and exits"
+	echo "        IP: Returns only the IP of the provided site"
 	echo "    -c"
-	echo "        Returns the username@ip formated for use with scp."
+	echo "        Copy: Returns the username@ip formated for use with scp."
 	echo "          ie. \"scp \$(site -c SITE_CODE):file1 .\""
 	echo "    -q"
-	echo "        Quite. Makes the script have minimal output."
+	echo "        Quite: Makes the script have minimal output."
 	echo "    -d"
-	echo "        Delete. Deletes the entry. Will create a backup of connections as a .backup"
+	echo "        Delete: Deletes the entry. Will create a backup of connections as a .backup"
 	echo "    -f"
-	echo "        Force. Forces the script so it does not ask for confirmation."
+	echo "        Force: Forces the script so it does not ask for confirmation."
 	echo "    -t"
-	echo "        Tells the program to estabish a tunnel to access mysql"
+	echo "        Tunnel: Tells the program to estabish a tunnel to access mysql"
 	echo "          -L 4567:localhost:3306"
 	echo "    -l"
-	echo "        Lists all sites matching the partial SITE_CODE provided. "
+	echo "        List: Lists all sites matching the partial SITE_CODE provided. "
 	echo "          ie: site -l SHC returns all Shell Canada sites"
 	echo "    -p PASSWORD"
-	echo "        Supply the program password (One password to rule them all)"
+	echo "        Password: Supply the program password (One password to rule them all)"
 	echo "        This is not a site specific password. It is used to decrypt the other passwords"
-	echo "    NOTE: The password can never be changed as it is used to encrypt the passwords of"
-	echo "          each site. If the script's password changes it requires all site passwords to"
-	echo "          be removed and re-entered. Also the passwords md5sum is hard coded."
+	echo "        NOTE:" 
+	echo "            If the script's master password changes it requires all site passwords to"
+	echo "            be removed and re-entered."
+	echo "    -m"
+	echo "        Master: Changes the master passowrd of the script."
+	echo "        WARNING!! -- This will remove all stored site passwords! Use with caution"
 	echo ""
 	echo "Brought to you by Tyler Hoyt."
 }
@@ -62,12 +65,13 @@ FORCE=0
 DEL=0
 USE_TUNNEL=0
 LIST=0
+MASTER=0
 PASSWORD=""	########################################### To make this program secure. remove the text between the quotes so it assigns PASSWORD an empty string.
 HPASSWORD=$(head -n 1 $CONNECTIONS | sed 's/#//') ############### This is the md5 of the password. 
 PASS_HINT="The password is the same as most tms6 servers"
 
 
-while getopts "h?n:ericqfdp:tl" opt; do
+while getopts "h?n:ericqfdp:tlm" opt; do
     case "$opt" in
     h|\?)
         usage
@@ -106,6 +110,9 @@ while getopts "h?n:ericqfdp:tl" opt; do
 	l)
 		LIST=1
 		;;
+	m)
+		MASTER=1
+		;;
 	*)
         echo "What the hell did you enter?!?"
         exit 1
@@ -119,8 +126,10 @@ shift $((OPTIND-1))
 
 if [ "$#" -ne "1" ]; then			#If the site code is not provided
 	if [ "$LIST" -ne "1" ] ; then	#And if I did not ask it to list all sites
-		usage						#Then print usage
-		exit 0						#And exit
+		if [ "$MASTER" -eq "0" ] ; then
+			usage						#Then print usage
+			exit 0						#And exit
+		fi
 	fi
 fi
 
@@ -157,8 +166,10 @@ line=$(grep -i "^$1" $CONNECTIONS)
 # Ensure there is only one entry for that site code
 if [ $(echo "$line" | wc -l) -gt "1" ]; then
 	if [ "$LIST" -eq "0" ] ; then
-		echo "There are two lines with that site code! DANGER WILL ROBINSON, DANGER!"
-		exit 1
+		if [ "$MASTER" -eq "0" ] ; then
+			echo "There are two lines with that site code! DANGER WILL ROBINSON, DANGER!"
+			exit 1
+		fi
 	fi
 fi
 
@@ -205,7 +216,7 @@ fi
 # If the user did not supply the password through the command line
 #	and the password is not included in the headder then get it.
 tries=0
-while [ -z "$PASSWORD"  ] ; do
+while [ "$(echo $PASSWORD | md5sum)" != "$HPASSWORD"  ] ; do
 	read -sp "Password: " PASSWORD
 	echo
 	if [ "$(echo $PASSWORD | md5sum)" != "$HPASSWORD" ] ; then
@@ -218,14 +229,41 @@ while [ -z "$PASSWORD"  ] ; do
 			echo "Too many failed attempts"
 			exit 0
 		fi
-		PASSWORD=""
 	fi
 done
+
+# Change the master password of the script
+if [ "$MASTER" -eq "1" ] ; then
+	if ! ask "Are you sure you want to change the master password?" ; then
+		exit 0
+	fi
+	if ! ask "You realize this will reset all of the saved passwords?" ; then
+		exit 0
+	fi
+	newpass1="1"
+    newpass2="2"
+    while [ "$newpass1" != "$newpass2" ] ; do
+        read -sp "Enter new password: " newpass1
+        echo
+        read -sp "Please re-enter  password: " newpass2
+        echo
+        if [ "$newpass1" != "$newpass2" ] ; then
+            echo "The passwords entered do not match. Please try again..."
+            echo
+        fi
+    done
+	# Now we established a new password.
+	# Hash the password and replace the 1st line of the connections with the hashed password
+	newhash=$(echo $newpass1 | md5sum | sed 's/^/#/')
+	#Replace the first line with the new hash and remove anything after 3rd column form connections
+	sed -i.oldpass -e "1s/.*/$newhash/ ; /^#/! s/\(^[^$DELIM]*$DELIM[^$DELIM]*$DELIM[^$DELIM]*$DELIM\).*/\1/" $CONNECTIONS
+	exit 0
+fi
 
 #If anything is missing or we are in edit mode then prompt the user
 if [ -z "$code" ]; then
 	if ! ask "There is no site information for site \"$(echo $1 | tr '[:lower:]' '[:upper:]')\". Would you like to add it?"; then
-		exit 0;
+		exit 0
 	fi
 	mod=1
 	code="$(echo $1 | tr '[:lower:]' '[:upper:]')"

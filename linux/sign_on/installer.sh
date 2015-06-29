@@ -2,7 +2,7 @@
 
 ## This is the installer to allow access to the site script within the PATH variable
 ## HOW TO RUN:
-##		/support/site_login/installer.sh
+##		./installer.sh
 ##		Then exit out and log back in
 
 
