@@ -1,0 +1,19 @@
+# file: site
+# site parameter-completion
+
+_site ()   #  By convention, the function name
+{                 #+ starts with an underscore.
+	local cur
+	# Pointer to current completion word.
+	# By convention, it's named "cur" but this isn't strictly necessary.
+
+	COMPREPLY=()   # Array variable storing the possible completions.
+	cur=$( echo ${COMP_WORDS[COMP_CWORD]} | tr -s '[:lower:]' '[:upper:]' )
+
+	COMPREPLY=( $( compgen -W "$(site -l | tr '\n' ' ')" -- $cur ) );
+
+	return 0
+}
+
+complete -F _site -o filenames site
+#        ^^ ^^^^^  Invokes the function _site.

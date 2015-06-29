@@ -3,7 +3,7 @@
 # Print usage
 usage() {
 	echo "Usage:"
-	echo "    $(basename $0) [-h|-?] [-n FILE_NAME] [-p PASSWORD] [-ericqdft] SITE_CODE"
+	echo "    $(basename $0) [-h|-?] [-n FILE_NAME] [-p PASSWORD] [-ericqdftl] SITE_CODE"
 	echo ""
 	echo "Options:"
 	echo "    -h/-?"
@@ -33,11 +33,14 @@ usage() {
 	echo "    -t"
 	echo "        Tells the program to estabish a tunnel to access mysql"
 	echo "          -L 4567:localhost:3306"
+	echo "    -l"
+	echo "        Lists all sites matching the partial SITE_CODE provided. "
+	echo "          ie: site -l SHC returns all Shell Canada sites"
 	echo "    -p PASSWORD"
 	echo "        Supply the program password (One password to rule them all)"
-	echo "        This is not a site specifiv password. It is used to decrypt the other passwords"
+	echo "        This is not a site specific password. It is used to decrypt the other passwords"
 	echo "    NOTE: The password can never be changed as it is used to encrypt the passwords of"
-	echo "          each site. If the script's password changes it requires all site passwors to"
+	echo "          each site. If the script's password changes it requires all site passwords to"
 	echo "          be removed and re-entered. Also the passwords md5sum is hard coded."
 	echo ""
 	echo "Brought to you by Tyler Hoyt."
@@ -46,7 +49,6 @@ usage() {
 # Process Arguments
 # A POSIX variable
 OPTIND=1         # Reset in case getopts has been used previously in the shell.
-EXPECT_ARG_COUNT=1 # number of args AFTER the flags
 # Initialize our own variables:
 DELIM=';'
 ROOTUSER='root'
@@ -59,10 +61,13 @@ VERB=1
 FORCE=0
 DEL=0
 USE_TUNNEL=0
+LIST=0
 PASSWORD=""	########################################### To make this program secure. remove the text between the quotes so it assigns PASSWORD an empty string.
 HPASSWORD="1f23be7d7b7b36403c46be71939012a3  -" ############### This is the md5 of the password. 
+PASS_HINT="The password is the same as most tms6 servers"
 
-while getopts "h?n:ericqfdp:t" opt; do
+
+while getopts "h?n:ericqfdp:tl" opt; do
     case "$opt" in
     h|\?)
         usage
@@ -98,8 +103,11 @@ while getopts "h?n:ericqfdp:t" opt; do
     t)
 		USE_TUNNEL=1
 		;;
+	l)
+		LIST=1
+		;;
 	*)
-        echo "What the hell did you enter???"
+        echo "What the hell did you enter?!?"
         exit 1
 		;;
     esac
@@ -109,8 +117,11 @@ shift $((OPTIND-1))
 
 [ "$1" = "--" ] && shift
 
-if [ "$#" -ne "$EXPECT_ARG_COUNT" ]; then
-	exit 0
+if [ "$#" -ne "1" ]; then			#If the site code is not provided
+	if [ "$LIST" -ne "1" ] ; then	#And if I did not ask it to list all sites
+		usage						#Then print usage
+		exit 0						#And exit
+	fi
 fi
 
 ################################################################################
@@ -141,12 +152,14 @@ ask() {
 }
 
 # Get the line that matchest the site code provided
-line=$(grep "^$1" $CONNECTIONS)
+line=$(grep -i "^$1" $CONNECTIONS)
 
 # Ensure there is only one entry for that site code
 if [ $(echo "$line" | wc -l) -gt "1" ]; then
-	echo "There are two lines! ERROR, ERROR, DANGER WILL ROBINSON, DANGER!"
-	return 1
+	if [ "$LIST" -eq "0" ] ; then
+		echo "There are two lines with that site code! DANGER WILL ROBINSON, DANGER!"
+		exit 1
+	fi
 fi
 
 # If the line is good then parse it in to components
@@ -172,10 +185,18 @@ if [ "$IPONLY" == "1" ] ; then
 	exit 0
 fi
 
+#List all sites that start with the given code
+if [ "$LIST" == "1" ] ; then
+	echo "$(grep -v '#' $CONNECTIONS | egrep -i "^$1" | cut -f1 -d$DELIM)"
+	exit 0
+fi
+
+#Delete the chosen record
 if [ "$DEL" == "1" ] ; then
-	if ask "Do you want to delete $code?" ; then
-		if ask "Are you sure you want to delete $code?" ; then
+	if ask "Are you sure you want to delete $code?" ; then
+		if ask "Are you really sure you want to delete $code?" ; then
 			sed -i.backup "/^$code.*/d" $CONNECTIONS
+			echo "I created a .backup of the old connections incase you weren't sure"
 		fi
 	fi
 	exit 0
@@ -191,7 +212,7 @@ while [ -z "$PASSWORD"  ] ; do
 		tries=$(($tries+1))
 		echo "$tries failed attempt(s)"
 		if [ $tries -eq 2 ] ; then
-			echo "Hint: It's the same password used EVERYWHERE at Toptech"
+			echo "$PASS_HINT"
 		fi
 		if [ $tries -eq 3 ] ; then
 			echo "Too many failed attempts"
@@ -203,11 +224,11 @@ done
 
 #If anything is missing or we are in edit mode then prompt the user
 if [ -z "$code" ]; then
-	if ! ask "There is no site information for site \"$1\". Would you like to add it?"; then
+	if ! ask "There is no site information for site \"$(echo $1 | tr '[:lower:]' '[:upper:]')\". Would you like to add it?"; then
 		exit 0;
 	fi
 	mod=1
-	code="$1"
+	code="$(echo $1 | tr '[:lower:]' '[:upper:]')"
 fi
 
 if [ -z "$ip" ] || [ "$EDIT" == "1" ] ; then
@@ -269,11 +290,12 @@ fi
 # If any of the fields were modefied then ask if it's ok and write it to the file
 if [ "$mod" == "1" ] ; then
 	newstring="$code$DELIM $ip$DELIM $user$DELIM $pass$DELIM $rpass"
-	echo -e "Writing connection to file:\n\t$newstring"
-	if ask "Is this ok?" ; then
+	#echo -e "Writing connection to file:\n\t$newstring"
+	#if ask "Is this ok?" ; then
+		echo "Writing to connection file..."
 		sed -i.backup "/^$code.*/d" $CONNECTIONS
 		echo "$newstring" >> $CONNECTIONS
-	fi
+	#fi
 fi
 
 #Display the info for the user if verbose
