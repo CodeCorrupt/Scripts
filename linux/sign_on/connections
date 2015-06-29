@@ -1,3 +1,9 @@
+#1f23be7d7b7b36403c46be71939012a3  -
+# !!!!! Important !!!!!
+# The first line of the file needs to be the md5sum of the master password
+# with a # infront of it
+
+
 # This consists of 4 ';' seperated fields
 # 1) Site code	- The 6 alpha/numeric code that identefies the site
 # 2) IP			- The IP of the site

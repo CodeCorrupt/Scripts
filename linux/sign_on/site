@@ -63,7 +63,7 @@ DEL=0
 USE_TUNNEL=0
 LIST=0
 PASSWORD=""	########################################### To make this program secure. remove the text between the quotes so it assigns PASSWORD an empty string.
-HPASSWORD="1f23be7d7b7b36403c46be71939012a3  -" ############### This is the md5 of the password. 
+HPASSWORD=$(head -n 1 $CONNECTIONS | sed 's/#//') ############### This is the md5 of the password. 
 PASS_HINT="The password is the same as most tms6 servers"
 
 
