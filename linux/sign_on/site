@@ -3,7 +3,7 @@
 # Print usage
 usage() {
 	echo "Usage:"
-	echo "    $(basename $0) [-h|-?] [-n FILE_NAME] [-p PASSWORD] [-ericqdftlim] SITE_CODE"
+	echo "    $(basename $0) [-h|-?] [-ericqdftlim] [-n FILE_NAME] [-p PASSWORD] [SITE_CODE]"
 	echo ""
 	echo "Options:"
 	echo "    -h/-?"
@@ -127,13 +127,16 @@ shift $((OPTIND-1))
 if [ "$#" -ne "1" ]; then			#If the site code is not provided
 	if [ "$LIST" -ne "1" ] ; then	#And if I did not ask it to list all sites
 		if [ "$MASTER" -eq "0" ] ; then
-			usage						#Then print usage
-			exit 0						#And exit
+			read -p "Please enter a site code: " code
 		fi
 	fi
+else
+	code=$1
 fi
 
-################################################################################
+# Make the code upper case
+code=$(echo $code | tr '[:lower:]' '[:upper:]')
+
 ############################## Actual code... ##################################
 ################################################################################
 
@@ -161,7 +164,7 @@ ask() {
 }
 
 # Get the line that matchest the site code provided
-line=$(grep -i "^$1" $CONNECTIONS)
+line=$(grep -i "^$code" $CONNECTIONS)
 
 # Ensure there is only one entry for that site code
 if [ $(echo "$line" | wc -l) -gt "1" ]; then
@@ -174,7 +177,7 @@ if [ $(echo "$line" | wc -l) -gt "1" ]; then
 fi
 
 # If the line is good then parse it in to components
-code=$(echo "$line" | cut -f1 -d$DELIM | sed "s/^\s\+//" | sed "s/\s\+$//")
+#code=$(echo "$line" | cut -f1 -d$DELIM | sed "s/^\s\+//" | sed "s/\s\+$//")
 ip=$(echo "$line" | cut -f2 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
 user=$(echo "$line" | cut -f3 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
 pass=$(echo "$line" | cut -f4 -d$DELIM  | sed "s/^\s\+//" | sed "s/\s\+$//")
@@ -198,7 +201,7 @@ fi
 
 #List all sites that start with the given code
 if [ "$LIST" == "1" ] ; then
-	echo "$(grep -v '#' $CONNECTIONS | egrep -i "^$1" | cut -f1 -d$DELIM)"
+	echo "$(grep -v '#' $CONNECTIONS | egrep -i "^$code" | cut -f1 -d$DELIM)"
 	exit 0
 fi
 
@@ -262,11 +265,11 @@ fi
 
 #If anything is missing or we are in edit mode then prompt the user
 if [ -z "$code" ]; then
-	if ! ask "There is no site information for site \"$(echo $1 | tr '[:lower:]' '[:upper:]')\". Would you like to add it?"; then
+	if ! ask "There is no site information for site \"$(echo $code | tr '[:lower:]' '[:upper:]')\". Would you like to add it?"; then
 		exit 0
 	fi
 	mod=1
-	code="$(echo $1 | tr '[:lower:]' '[:upper:]')"
+	code="$(echo $code | tr '[:lower:]' '[:upper:]')"
 fi
 
 if [ -z "$ip" ] || [ "$EDIT" == "1" ] ; then
