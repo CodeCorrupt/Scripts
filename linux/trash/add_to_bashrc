@@ -3,7 +3,7 @@ alias ts='trash'                            # Abreviation for homebrews trash
 trash () {				    # trash:        Moves a file to the MacOS trash 
 	mkdir -p ~/.trash
 	mv "$@" ~/.trash
-	. /set_title.sh #TODO: Make this have $PWD and work....
+#	. /set_title.sh #TODO: Make this have $PWD and work.... ###No longer uses this. to many problems
 
 empty () {				    # empty:	    Empties the .trash folder
 	IFS=$'\n'
