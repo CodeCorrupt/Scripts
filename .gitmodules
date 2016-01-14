@@ -1,0 +1,3 @@
+[submodule "RunOnAll"]
+	path = RunOnAll
+	url = git@github.com:CodeCorrupt/RunOnAll.git
